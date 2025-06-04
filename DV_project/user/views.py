@@ -33,10 +33,11 @@ class Register(viewsets.ViewSet):
                 if User.objects.filter(username=username).exists():
                     return Response({'message': '帳號已存在'}, status=200)
                 else:
-                   
+                    # 密碼加密
+                    hashed_password = make_password(password)
                     User.objects.create(
                         username=username,
-                        password=password
+                        password=hashed_password
                     )
                     return Response({'message': '註冊成功'}, status=200)
         
@@ -54,27 +55,21 @@ class Login(viewsets.ViewSet):
             return Response({'error': '請提供用戶名和密碼'}, status=400)
 
         
-        # 從數據庫查找用戶
-        user = User.objects.get(username=username)
+        try:
+            # 從數據庫查找用戶
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            return Response({'error': '用戶不存在'}, status=400)
 
-            # 驗證密碼 (假設密碼是明文，建議改為加密驗證)
-        if check_password(password, user.password):  
-  
-            # 生成 JWT Token
-            
-                metadata = User.objects.get(id=user)
-                metadata_dict = model_to_dict(metadata)
-
-                   # 生成 JWT Token
-                refresh = RefreshToken.for_user(user)
-
-                # 返回數據
-                return Response({
-                    'success': '登入成功',
-                    'access_token': str(refresh.access_token),
-                    'refresh_token': str(refresh),
-                    'user_metadata': metadata_dict,
-                }, status=200)
-            
+        # 驗證加密過的密碼
+        if check_password(password, user.password):
+            metadata_dict = model_to_dict(user)
+            refresh = RefreshToken.for_user(user)
+            return Response({
+            'success': '登入成功',
+            'access_token': str(refresh.access_token),
+            'refresh_token': str(refresh),
+            'user_metadata': metadata_dict,
+            }, status=200)
         else:
-            return Response({'error': '密碼錯誤'}, status=200)
+            return Response({'error': '密碼錯誤'}, status=400)
